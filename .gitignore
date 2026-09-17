@@ -47,9 +47,13 @@ CMakeLists.txt.user*
 .vs
 .vscode
 *.code-workspace
-*.zip
-
 # Build
-build/
+build*/
+release/
+debug/
 DrCOM_JLU_Qt
 DrCOM_JLU_Qt.exe
+*.AppImage
+*.tar.gz
+*.zip
+*.log

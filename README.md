@@ -58,7 +58,7 @@ install -Dm755 DrCOM_JLU_Qt ~/.local/bin/drcom-jlu-qt
 Type=Application
 Name=DrCOM JLU
 Comment=吉林大学校园网第三方 Qt 客户端
-Exec=/home/eric/.local/bin/drcom-jlu-qt --minimized
+Exec=drcom-jlu-qt --minimized
 Icon=drcom-jlu-qt
 Terminal=false
 Categories=Network;
@@ -70,21 +70,9 @@ X-GNOME-Autostart-enabled=true
 
 ## 运行截图
 
-### Arch Linux (KDE Plasma / Wayland)
+### Arch Linux (KDE Plasma 6 / Wayland)
 
 ![archlinux.png](images/archlinux.png)
-
-### Windows 11
-
-![win11.png](images/win11.png)
-
-### macOS
-
-![mactahoe.png](images/tahoe.png)
-
-### Ubuntu
-
-![nCtJ2Q.png](https://s2.ax1x.com/2019/09/02/nCtJ2Q.png)
 
 ---
 
