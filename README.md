@@ -1,76 +1,111 @@
 # drcom-jlu-qt
-drcom for jlu in qt cross platform
 
-- 需要新版本，可以自己到Actions里手动触发build workflow，十分钟后到release里找编译结果，是以时间戳为标记的。
-- build workflow产生的linux版本是基于ubuntu22.04编译的单一二进制文件，没有附带运行库，请在系统里安装qt 6.5.3+ 运行环境。
+吉林大学校园网第三方跨平台客户端（DrCOM 协议 / Qt 实现）。
 
-跨平台 **win linux** [下载链接](https://github.com/code4lala/drcom-jlu-qt/releases)
-**macOS** [下载链接](https://github.com/jsy061030/drcom-jlu-qt-macOS/releases)
+- **跨平台支持**：Linux (Arch Linux, Ubuntu 等)、Windows (MinGW / MSVC)、macOS (Apple Silicon)。
+- **GitHub Actions 持续集成**：可在仓库 Actions 页面手动触发 `build workflow`，自动生成各平台最新编译产物。
+- **Arch Linux 原生兼容**：完美支持 Qt6 与 Wayland 原生协议渲染，内存占用低至 ~26MB。
 
-# 功能对比
-| 功能                 | 官方 | 本版 | 说明                                                             |
-|----------------------|------|------|------------------------------------------------------------------|
-| 记住密码 自动登录    | √    | √    |                                                                  |
-| 密文保存密码         | √    | √    | Windows平台上采用 Windows 提供的 数据保护 API（DPAPI），保护仅当前账户能够解密数据，其他平台暂时使用简单的XOR加密 |
-|      <<<已知问题>>>    |      |       |                                          |
-| 多语言支持         | √    |      | 或许不会改进了...                                                  |
-| 被顶掉               | √    |      | 警告！巨大缺陷！本版掉线后会自动重启重新登录！所以顶不掉！待改进 |
-| 释放socket           | √    |      | 不是每次关机前都能保证释放socket，导致有时候会报端口已占用错误，待改进 |
-|      <<<优势>>>    |      |       |                                          |
-| 打开速度             | 慢   | 快   | 我也不知道为什么官版打开那么慢                                   |
-| 单实例               |      | √    | 开机自启慢的话可以直接打开不会报错说已经在运行                   |
-| 快速注销             |      | √    | 官方版是真·注销，本版是直接关闭socket，所以不需要等20s的发包周期 |
-| 托盘图标无bug          |      | √    | 不知道你们有没有碰到过官方win版托盘有俩图标的bug                 |
-| 可选不弹出校园网之窗 |      | √    |                                                                  |
-| 完全隐藏登录窗口     |      | √    |                                                                  |
-| 适配高分屏           |      | √    |                                                                  |
-| 快速重启客户端       |      | √    | 有时候重启功能不好使，点了重启当前退了没有蹦出来新的，待改进     |
-| win版不需要管理员    |      | √    |                                                                  |
-| linux版最小化到托盘  |      | √    |                                                                  |
-| linux版不需要root    |      | √    |                                                                  |
-| 不限制NAT           |      | √    | 并不支持有违校方意愿的做法，请自行承担后果                           |
+[最新 Releases 下载](https://github.com/ZHAO20060708/drcom-jlu-qt/releases)
 
-# 注意事项
-- 掉线后客户端自动重启重连尝试三次。自动重启登录成功后不弹窗口只最小化到托盘。注：自动重启功能依赖于“记住我”选项的勾选，否则没有账户密码自行重启也并没有什么用
-- 连接JLU.PC登录的时候mac地址随便填就可以，或者随便选一个网卡也可以，只有有线网要求mac地址和网络中心的一致
-- macOS上，可能会面临“未认证的开发者”之类的提示，这时打开系统偏好设置，打开安全性与隐私，找到类似“仍要打开”类似的按钮按下，再次打开此app，即可运行。如果还不行，或显示“此app已损坏，你应该扔到废纸篓”，请参考[此解决办法](https://zhuanlan.zhihu.com/p/135948430)。
+---
 
-# 截图
-> WIN:
+## 功能特性与对比
 
-![n9c6aQ.png](https://s2.ax1x.com/2019/09/02/n9c6aQ.png)
+| 功能特性 | 官方客户端 | 本版客户端 | 说明 |
+| :--- | :---: | :---: | :--- |
+| **开机自动登录 / 记住密码** | √ | √ | 支持配置记住密码后完全静默后台登录 |
+| **密码加密存储** | √ | √ | Windows 使用 DPAPI，其他平台使用混淆加密 |
+| **秒级极速启动** | 慢 | **极快** | 纯 C++/Qt 编写，无多余外壳与繁重开销 |
+| **单实例保护** | × | **√** | 重复打开自动唤醒已有实例，杜绝多实例冲突 |
+| **系统托盘常驻** | 偶发双图标 | **√** | 支持最小化至托盘与原生 Wayland/X11 托盘图标 |
+| **静默自启动参数** | × | **√** | 支持 `--minimized` 启动直接静默驻留后台 |
+| **可选不弹校园网之窗** | × | **√** | 登录成功后可选择不自动打开 notice 欢迎页 |
+| **心跳防抖与端口复用** | 差 | **√** | 内置 3 次心跳超时重试，端口预设复用，杜绝端口占用 |
+| **规范日志输出** | × | **√** | 写入系统标准数据目录，不污染工作区与系统日志 |
+| **免 Root / 免管理员** | × | **√** | 绑定高位非特权 UDP 端口（61440），普通用户权限即可运行 |
+| **高分屏 (HiDPI) 适配** | 模糊 | **√** | Qt6 默认全缩放矢量适配 |
+
+---
+
+## 快速上手
+
+### Arch Linux / 基于 Arch 的发行版
+
+Arch Linux 用户可以直接安装 Qt6 开发包并在本地一键编译出极度轻量的原生二进制（~200KB）：
+
+```bash
+# 1. 安装编译依赖
+sudo pacman -S --needed base-devel qt6-base
+
+# 2. 编译项目
+git clone https://github.com/ZHAO20060708/drcom-jlu-qt.git
+cd drcom-jlu-qt
+qmake6 DrCOM_JLU_Qt.pro
+make -j$(nproc)
+
+# 3. 安装与运行
+install -Dm755 DrCOM_JLU_Qt ~/.local/bin/drcom-jlu-qt
+~/.local/bin/drcom-jlu-qt --minimized
+```
+
+### 开机自启动配置 (Linux / XDG)
+
+在 `~/.config/autostart/drcom-jlu-qt.desktop` 创建如下文件即可随桌面环境（KDE / GNOME 等）自动拉起：
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=DrCOM JLU
+Comment=吉林大学校园网第三方 Qt 客户端
+Exec=/home/eric/.local/bin/drcom-jlu-qt --minimized
+Icon=drcom-jlu-qt
+Terminal=false
+Categories=Network;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+```
+
+---
+
+## 运行截图
+
+### Arch Linux (KDE Plasma / Wayland)
+
+![archlinux.png](images/archlinux.png)
+
+### Windows 11
 
 ![win11.png](images/win11.png)
 
-> UBUNTU:
+### macOS
+
+![mactahoe.png](images/tahoe.png)
+
+### Ubuntu
 
 ![nCtJ2Q.png](https://s2.ax1x.com/2019/09/02/nCtJ2Q.png)
 
+---
 
-> MacOS:
-![mactahoe.png](images/tahoe.png)
+## 注意事项
 
-> Ubuntu 18不显示托盘图标的bug的解决方案：
-> [https://askubuntu.com/questions/1056226/ubuntu-budgie-18-04-lts-system-tray-icons-not-all-showing](https://askubuntu.com/questions/1056226/ubuntu-budgie-18-04-lts-system-tray-icons-not-all-showing)
+- **MAC 地址选择**：连接吉大校园 Wi-Fi（如 `JLU.PC`）时，MAC 地址可以任意选择已存在的网卡或保持默认；仅在插有线网线时要求 MAC 地址与校园网认证登记的网卡一致。
+- **自动重连**：掉线后若勾选了“记住我”和“自动登录”，客户端会自动尝试重连；重试期间保持静默，不会反复弹窗打扰。
+- **macOS 安全提示**：在 macOS 上初次打开若提示“未认证的开发者”或“已损坏”，请前往“系统设置 - 隐私与安全性”点击“仍要打开”，或执行 `xattr -cr /Applications/DrCOM_JLU_Qt.app`。
 
-> MacOS不显示dock图标的解决办法：
-> 自己找个图标（images/icon.ico，可能需要转为icns格式），在右键-显示简介里替换掉
+---
 
-# 感谢
+## 鸣谢
 
-**图标作者**
-> [https://github.com/lyj3516](https://github.com/lyj3516)
+- 图标设计：[lyj3516](https://github.com/lyj3516)
+- 吉大 DrCOM 协议分析：[jlu-drcom-client](https://github.com/drcoms/jlu-drcom-client)
+- 单实例实现：[SingleApplication](https://github.com/itay-grudev/SingleApplication)
+- 认证发包算法参考：[dogcom](https://github.com/mchome/dogcom)
+- 原作者项目：[code4lala/drcom-jlu-qt](https://github.com/code4lala/drcom-jlu-qt)
 
-**jlu的drcom协议细节**
-> [https://github.com/drcoms/jlu-drcom-client/blob/master/jlu-drcom-java/jlu-drcom-protocol.md](https://github.com/drcoms/jlu-drcom-client/blob/master/jlu-drcom-java/jlu-drcom-protocol.md)
+---
 
-**唯一实例**
-> [https://github.com/itay-grudev/SingleApplication](https://github.com/itay-grudev/SingleApplication)
+## 许可证
 
-# 特别感谢
-**登录部分复制了jlu部分代码**
-> [https://github.com/mchome/dogcom](https://github.com/mchome/dogcom)
-
-# 许可证
-
-[GNU Affero General Public License v3.0](https://github.com/code4lala/drcom-jlu-qt/blob/master/LICENSE)
+本项目基于 [GNU Affero General Public License v3.0](LICENSE) 开源。
