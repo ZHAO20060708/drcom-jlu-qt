@@ -14,6 +14,7 @@ jobs:
         include:
           # Linux x86_64 - 使用 ubuntu-22.04
           - os: ubuntu-22.04
+            qt_version: '6.5.3'
             qt_arch: gcc_64
             platform_name: Linux-x64
             arch_label: x86_64
@@ -23,6 +24,7 @@ jobs:
 
           # Windows MinGW
           - os: windows-latest
+            qt_version: '6.5.3'
             qt_arch: win64_mingw
             compiler: mingw
             platform_name: Windows-MinGW
@@ -34,6 +36,7 @@ jobs:
 
           # Windows MSVC
           - os: windows-latest
+            qt_version: '6.7.2'
             qt_arch: win64_msvc2019_64
             compiler: msvc
             platform_name: Windows-MSVC
@@ -45,6 +48,7 @@ jobs:
 
           # macOS Apple Silicon
           - os: macos-latest
+            qt_version: '6.5.3'
             qt_arch: clang_64
             mac_arch: arm64
             platform_name: macOS-AppleSilicon
@@ -62,10 +66,10 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.7.2'
+        version: ${{ matrix.qt_version }}
         arch: ${{ matrix.qt_arch }}
         host: ${{ matrix.is_macos && 'mac' || matrix.is_windows && 'windows' || 'linux' }}
-        cache: true
+        cache: false
 
     - name: Setup MSYS2 for MinGW
       if: matrix.compiler == 'mingw'
@@ -106,6 +110,9 @@ jobs:
       run: |
         if [ "${{ runner.os }}" == "Windows" ] && [ "${{ matrix.compiler }}" == "mingw" ]; then
           mingw32-make -j$(nproc)
+        elif [ "${{ runner.os }}" == "macOS" ]; then
+          find . -name "Makefile*" -exec sed -i '' -e 's/-framework AGL//g' {} + 2>/dev/null || true
+          make -j$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
         else
           make -j$(nproc)
         fi
@@ -294,17 +301,31 @@ jobs:
 
   release:
     needs: build
-    if: needs.build.result == 'success'
+    if: always() && !cancelled() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: ./artifacts
-    
+        merge-multiple: true
+
+    - name: Check Artifacts
+      id: check-artifacts
+      shell: bash
+      run: |
+        echo "=== 下载的发布产物 ==="
+        ls -lh ./artifacts
+        COUNT=$(find ./artifacts -type f | wc -l)
+        if [ "$COUNT" -eq 0 ]; then
+          echo "❌ 未找到任何构建产物"
+          exit 1
+        fi
+        echo "✅ 找到 $COUNT 个产物"
+
     - name: Determine Release Name
       id: determine-release
       run: |
@@ -314,19 +335,20 @@ jobs:
           echo "release_name=Release $TAG_NAME" >> $GITHUB_OUTPUT
         else
           TIMESTAMP=$(date -u +'%Y.%m.%d-%H%M%S')
-          echo "tag_name=manual-$TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "release_name=Manual Build $TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "tag_name=v1.0.0.7-$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "release_name=Release v1.0.0.7 ($TIMESTAMP)" >> $GITHUB_OUTPUT
         fi
-    
+
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.determine-release.outputs.tag_name }}
         name: ${{ steps.determine-release.outputs.release_name }}
+        target_commitish: ${{ github.sha }}
         draft: false
         prerelease: ${{ github.event_name == 'workflow_dispatch' }}
         generate_release_notes: true
         files: |
-          ./artifacts/**/*
+          ./artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
