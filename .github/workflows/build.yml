@@ -62,7 +62,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3'
+        version: '6.7.2'
         arch: ${{ matrix.qt_arch }}
         host: ${{ matrix.is_macos && 'mac' || matrix.is_windows && 'windows' || 'linux' }}
         cache: true
