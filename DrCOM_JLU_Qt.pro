@@ -71,6 +71,16 @@ VERSION = 1.0.0.6
 
 win32:LIBS += -lwsock32
 win32:LIBS += -lcrypt32
+
+win32-msvc {
+    QMAKE_CXXFLAGS += /FIiterator
+    DEFINES += _SILENCE_STDEXT_CHECKED_ARRAY_ITERATOR_DEPRECATION_WARNING
+}
+
+macx {
+    QMAKE_LIBS_OPENGL -= -framework AGL
+    LIBS -= -framework AGL
+}
 # 更新日志：
 # v 0.0.0.0 实现基本功能
 # v 1.0.0.1 修复适配高DPI时只窗口大小适配但字号不适配的bug

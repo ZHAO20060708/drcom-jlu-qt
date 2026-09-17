@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Linux x86_64 - 使用 ubuntu-22.04
@@ -93,6 +94,7 @@ jobs:
       run: |
         if [ -n "${{ matrix.mac_arch }}" ]; then
           qmake ../DrCOM_JLU_Qt.pro CONFIG-=debug CONFIG+=release "QMAKE_APPLE_DEVICE_ARCHS=${{ matrix.mac_arch }}"
+          find . -name "Makefile*" -exec sed -i '' -e 's/-framework AGL//g' {} + 2>/dev/null || true
         else
           qmake ../DrCOM_JLU_Qt.pro CONFIG-=debug CONFIG+=release
         fi
