@@ -21,6 +21,7 @@
 // THE SOFTWARE.
 
 #include <QtCore/QTime>
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QThread>
 #include <QtCore/QDateTime>
 #include <QtCore/QByteArray>
@@ -95,7 +96,7 @@ SingleApplication::SingleApplication( int &argc, char *argv[], bool allowSeconda
 
         // Random sleep here limits the probability of a collision between two racing apps
         srand( QDateTime::currentMSecsSinceEpoch() % std::numeric_limits<uint>::max() );
-        QThread::sleep( 8 + static_cast <unsigned long>( static_cast <float>( rand() ) / RAND_MAX * 10 ) );
+        QThread::msleep( 8 + static_cast <unsigned long>( static_cast <float>( rand() ) / RAND_MAX * 10 ) );
     }
 
     if( inst->primary == false) {

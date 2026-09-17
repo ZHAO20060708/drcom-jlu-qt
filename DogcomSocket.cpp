@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #endif
 #include <string>
 #include <time.h>
@@ -54,16 +55,34 @@ void DogcomSocket::init(){
 #ifdef WIN32
         throw DogcomSocketException(DogcomError::SOCKET, WSAGetLastError());
 #else
-        throw DogcomSocketException(DogcomError::SOCKET,sockfd);
+        throw DogcomSocketException(DogcomError::SOCKET, errno);
 #endif
     }
+
+    // set port reuse BEFORE bind
+    int optval = 1;
+#ifdef WIN32
+    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof(optval))) < 0) {
+        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE, WSAGetLastError());
+    }
+#else
+    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof(optval))) < 0) {
+        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE, errno);
+    }
+
+#ifdef SO_REUSEPORT
+    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, (char *) &optval, sizeof(optval))) < 0) {
+        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE, errno);
+    }
+#endif
+#endif
 
     // bind socket
     if (bind(sockfd, (struct sockaddr *) &bind_addr, sizeof(bind_addr)) < 0) {
 #ifdef WIN32
         throw DogcomSocketException(DogcomError::BIND, WSAGetLastError());
 #else
-        throw DogcomSocketException(DogcomError::BIND,sockfd);
+        throw DogcomSocketException(DogcomError::BIND, errno);
 #endif
     }
 
@@ -82,28 +101,9 @@ void DogcomSocket::init(){
                                     WSAGetLastError());
 #else
         throw DogcomSocketException(DogcomError::SET_SOCK_OPT_TIMEOUT,
-                sockfd);
+                errno);
 #endif
     }
-
-    //set port reuse
-
-    int optval = 1;
-#ifdef WIN32
-    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof(optval))) < 0) {
-        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE, r);
-        }
-#else
-    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof(optval))) < 0) {
-        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE,r);
-    }
-
-#ifdef SO_REUSEPORT
-    if ((r = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, (char *) &optval, sizeof(optval))) < 0) {
-        throw DogcomSocketException(DogcomError::SET_SOCK_OPT_REUSE,r);
-    }
-#endif
-#endif
 }
 
 int DogcomSocket::write(const char *buf, int len) {

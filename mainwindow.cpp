@@ -1,4 +1,4 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QtNetwork/QNetworkInterface>
 #include <QList>
@@ -149,10 +149,13 @@ void MainWindow::RestartDrcom()
         dogcomController->LogOut();
     else if(CURR_STATE==STATE_OFFLINE){
         qDebug() << "quiting current instance...";
-        qApp->quit();
         qDebug() << "Restarting Drcom...";
-        QProcess::startDetached(qApp->arguments()[0], qApp->arguments());
+        QString appPath = qApp->applicationFilePath();
+        QStringList args;
+        if (bHideWindow) args << "--minimized";
+        QProcess::startDetached(appPath, args);
         qDebug() << "Restart done.";
+        qApp->quit();
     }
     // else if(CURR_STATE==STATE_LOGGING)
     // 正在登录时候退出，假装没看到，不理
@@ -383,10 +386,13 @@ void MainWindow::HandleOffline(int reason)
             return;
         }
         if(bRestart){
-            qApp->quit();
             qDebug() << "Restarting Drcom...";
-            QProcess::startDetached(qApp->arguments()[0], qApp->arguments());
+            QString appPath = qApp->applicationFilePath();
+            QStringList args;
+            if (bHideWindow) args << "--minimized";
+            QProcess::startDetached(appPath, args);
             qDebug() << "Restart done.";
+            qApp->quit();
             return;
         }
         QMessageBox::information(this, tr("Logout succeed"), tr("Logout succeed"));
@@ -507,7 +513,9 @@ void MainWindow::HandleOffline(int reason)
 	// 禁用注销按钮
 	DisableLogOutButton(true);
 	// 显示出窗口
-	ShowLoginWindow();
+	if (!bHideWindow) {
+		ShowLoginWindow();
+	}
 }
 
 void MainWindow::HandleLoggedIn()

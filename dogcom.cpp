@@ -1,4 +1,4 @@
-﻿#include "dogcom.h"
+#include "dogcom.h"
 
 #include <QDebug>
 #include "constants.h"
@@ -362,6 +362,13 @@ int DogCom::dhcp_login(DogcomSocket &socket, unsigned char seed[], unsigned char
 	login_packet[counter + ror_padding + 14] = 0x60;
 	login_packet[counter + ror_padding + 15] = 0xa2;
 
+	auto cleanup = [&]() {
+		delete[] login_packet;
+		delete[] MD5A_str;
+		delete[] MD5B_str;
+		delete[] checksum2_str;
+	};
+
 	qDebug() << "login_packet_size:" << login_packet_size;
 	socket.write((const char *)login_packet, login_packet_size);
 	print_packet("[Login sent]", login_packet, login_packet_size);
@@ -369,6 +376,7 @@ int DogCom::dhcp_login(DogcomSocket &socket, unsigned char seed[], unsigned char
 	if (socket.read((char *)recv_packet) <= 0)
 	{
 		qCritical() << "Failed to recv data";
+		cleanup();
 		return OFF_TIMEOUT;
 	}
 
@@ -376,38 +384,52 @@ int DogCom::dhcp_login(DogcomSocket &socket, unsigned char seed[], unsigned char
 	{
 		print_packet("[Login recv]", recv_packet, 100);
 		qDebug() << "<<< Login failed >>>";
+		int failReason = OFF_UNKNOWN;
 		if (recv_packet[0] == 0x05)
 		{
 			switch (recv_packet[4])
 			{
 			case LOGIN_CHECK_MAC:
-				return OFF_CHECK_MAC;
+				failReason = OFF_CHECK_MAC;
+				break;
 			case LOGIN_SERVER_BUSY:
-				return OFF_SERVER_BUSY;
+				failReason = OFF_SERVER_BUSY;
+				break;
 			case LOGIN_WRONG_PASS:
-				return OFF_WRONG_PASS;
+				failReason = OFF_WRONG_PASS;
+				break;
 			case LOGIN_NOT_ENOUGH:
-				return OFF_NOT_ENOUGH;
+				failReason = OFF_NOT_ENOUGH;
+				break;
 			case LOGIN_FREEZE_UP:
-				return OFF_FREEZE_UP;
+				failReason = OFF_FREEZE_UP;
+				break;
 			case LOGIN_NOT_ON_THIS_IP:
-				return OFF_NOT_ON_THIS_IP;
+				failReason = OFF_NOT_ON_THIS_IP;
+				break;
 			case LOGIN_NOT_ON_THIS_MAC:
-				return OFF_NOT_ON_THIS_MAC;
+				failReason = OFF_NOT_ON_THIS_MAC;
+				break;
 			case LOGIN_TOO_MUCH_IP:
-				return OFF_TOO_MUCH_IP;
+				failReason = OFF_TOO_MUCH_IP;
+				break;
 				// 升级客户端这个密码错了就会弹出俩
 			case LOGIN_UPDATE_CLIENT:
-				return OFF_WRONG_PASS;
+				failReason = OFF_WRONG_PASS;
+				break;
 			case LOGIN_NOT_ON_THIS_IP_MAC:
-				return OFF_NOT_ON_THIS_IP_MAC;
+				failReason = OFF_NOT_ON_THIS_IP_MAC;
+				break;
 			case LOGIN_MUST_USE_DHCP:
-				return OFF_MUST_USE_DHCP;
+				failReason = OFF_MUST_USE_DHCP;
+				break;
 			default:
-				return OFF_UNKNOWN;
+				failReason = OFF_UNKNOWN;
+				break;
 			}
 		}
-		return OFF_UNKNOWN;
+		cleanup();
+		return failReason;
 	}
 	else
 	{
@@ -416,7 +438,7 @@ int DogCom::dhcp_login(DogcomSocket &socket, unsigned char seed[], unsigned char
 	}
 
 	memcpy(auth_information, &recv_packet[23], 16);
-
+	cleanup();
 	return -1;
 }
 
@@ -424,77 +446,92 @@ int DogCom::keepalive_1(DogcomSocket &socket, unsigned char auth_information[])
 {
 	unsigned char keepalive_1_packet1[8] = {0x07, 0x01, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00};
 	unsigned char recv_packet1[1024], keepalive_1_packet2[38], recv_packet2[1024];
-	memset(keepalive_1_packet2, 0, 38);
-	if (socket.write((const char *)keepalive_1_packet1, 8) <= 0)
+
+	for (int retry = 0; retry < 3; ++retry)
 	{
-		qCritical() << "Failed to send data";
-		return 1;
-	}
-	qDebug() << "[Keepalive1 sent]";
-	//    print_packet("[Keepalive1 sent]",keepalive_1_packet1,42);
-	while (1)
-	{
-		if (socket.read((char *)recv_packet1) <= 0)
+		memset(keepalive_1_packet2, 0, 38);
+		if (socket.write((const char *)keepalive_1_packet1, 8) <= 0)
 		{
-			qCritical() << "Failed to recv data";
-			return 1;
+			qCritical() << "Failed to send data (keepalive1_packet1), retry:" << retry;
+			sleeper->Sleep(500);
+			continue;
 		}
-		else
+		qDebug() << "[Keepalive1 sent]";
+
+		bool challenge_ok = false;
+		while (1)
 		{
-			qDebug() << "[Keepalive1 challenge_recv]";
-			//            print_packet("[Keepalive1 challenge_recv]",recv_packet1,100);
-			if (recv_packet1[0] == 0x07)
+			if (socket.read((char *)recv_packet1) <= 0)
 			{
+				qCritical() << "Failed to recv keepalive1 challenge, retry:" << retry;
 				break;
-			}
-			else if (recv_packet1[0] == 0x4d)
-			{
-				qDebug() << "Get notice packet.";
-				continue;
 			}
 			else
 			{
-				qDebug() << "Bad keepalive1 challenge response received.";
-				return 1;
+				qDebug() << "[Keepalive1 challenge_recv]";
+				if (recv_packet1[0] == 0x07)
+				{
+					challenge_ok = true;
+					break;
+				}
+				else if (recv_packet1[0] == 0x4d)
+				{
+					qDebug() << "Get notice packet.";
+					continue;
+				}
+				else
+				{
+					qDebug() << "Bad keepalive1 challenge response received.";
+					break;
+				}
 			}
 		}
-	}
 
-	unsigned char keepalive1_seed[4] = {0};
-	int encrypt_type;
-	unsigned char crc[8] = {0};
-	memcpy(keepalive1_seed, &recv_packet1[8], 4);
-	encrypt_type = keepalive1_seed[0] & 3;
-	gen_crc(keepalive1_seed, encrypt_type, crc);
-	keepalive_1_packet2[0] = 0xff;
-	memcpy(keepalive_1_packet2 + 8, keepalive1_seed, 4);
-	memcpy(keepalive_1_packet2 + 12, crc, 8);
-	memcpy(keepalive_1_packet2 + 20, auth_information, 16);
-	keepalive_1_packet2[36] = rand() & 0xff;
-	keepalive_1_packet2[37] = rand() & 0xff;
-
-	if (socket.write((const char *)keepalive_1_packet2, 42) <= 0){
-		qCritical()<<"Failed to send data";
-		return 1;
-	}
-
-	if (socket.read((char *)recv_packet2) <= 0)
-	{
-		qCritical() << "Failed to recv data";
-		return 1;
-	}
-	else
-	{
-		qDebug() << "[Keepalive1 recv]";
-		//        print_packet("[Keepalive1 recv]",recv_packet2,100);
-
-		if (recv_packet2[0] != 0x07)
+		if (!challenge_ok)
 		{
-			qDebug() << "Bad keepalive1 response received.";
-			return 1;
+			sleeper->Sleep(500);
+			continue;
 		}
+
+		unsigned char keepalive1_seed[4] = {0};
+		int encrypt_type;
+		unsigned char crc[8] = {0};
+		memcpy(keepalive1_seed, &recv_packet1[8], 4);
+		encrypt_type = keepalive1_seed[0] & 3;
+		gen_crc(keepalive1_seed, encrypt_type, crc);
+		keepalive_1_packet2[0] = 0xff;
+		memcpy(keepalive_1_packet2 + 8, keepalive1_seed, 4);
+		memcpy(keepalive_1_packet2 + 12, crc, 8);
+		memcpy(keepalive_1_packet2 + 20, auth_information, 16);
+		keepalive_1_packet2[36] = rand() & 0xff;
+		keepalive_1_packet2[37] = rand() & 0xff;
+
+		if (socket.write((const char *)keepalive_1_packet2, 38) <= 0)
+		{
+			qCritical() << "Failed to send keepalive1_packet2, retry:" << retry;
+			sleeper->Sleep(500);
+			continue;
+		}
+
+		if (socket.read((char *)recv_packet2) <= 0)
+		{
+			qCritical() << "Failed to recv keepalive1 response, retry:" << retry;
+			sleeper->Sleep(500);
+			continue;
+		}
+		else
+		{
+			qDebug() << "[Keepalive1 recv]";
+			if (recv_packet2[0] != 0x07)
+			{
+				qDebug() << "Bad keepalive1 response received.";
+				sleeper->Sleep(500);
+				continue;
+			}
+		}
+		return 0;
 	}
-	return 0;
+	return 1;
 }
 
 int DogCom::keepalive_2(DogcomSocket &socket, int *keepalive_counter, int *first)

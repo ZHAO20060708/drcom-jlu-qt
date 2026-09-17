@@ -1,4 +1,4 @@
-﻿#include "dogcomcontroller.h"
+#include "dogcomcontroller.h"
 #include <QDebug>
 
 DogcomController::DogcomController()
@@ -12,8 +12,16 @@ DogcomController::DogcomController()
 }
 
 DogcomController::~DogcomController(){
-	if(sleeper!=nullptr) delete sleeper;
-	if(dogcom!=nullptr) delete dogcom;
+	if (dogcom != nullptr) {
+		dogcom->Stop();
+		dogcom->wait(2000);
+		delete dogcom;
+		dogcom = nullptr;
+	}
+	if (sleeper != nullptr) {
+		delete sleeper;
+		sleeper = nullptr;
+	}
 }
 
 void DogcomController::Login(const QString &account, const QString &password, const QString &mac_addr) {
